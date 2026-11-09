@@ -1,17 +1,15 @@
-# AEGIS // Indirect Prompt-Injection & Evidence Firewall
+# aegis-prompt-guard
 
 [![CI](https://github.com/al9eri/aegis-prompt-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/al9eri/aegis-prompt-guard/actions/workflows/ci.yml)
-![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-00F0FF?style=flat-square&labelColor=0B0F17)
-![Dependencies](https://img.shields.io/badge/Dependencies-Zero-10B981?style=flat-square&labelColor=0B0F17)
-![License](https://img.shields.io/badge/License-MIT-94A3B8?style=flat-square&labelColor=0B0F17)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**AEGIS** is a deterministic, zero-dependency static firewall for **LLM pipelines, RAG ingestion, and automated GRC/compliance evidence workflows**.
+A lightweight, zero-dependency Python static scanner and CLI for catching indirect prompt injections, Unicode smuggling (Trojan Source, Plane-14 tags), and encoded payloads in untrusted text documents before LLM or RAG ingestion.
 
-When ingesting untrusted vendor artifacts (SOC 2 reports, policy documents, logs, configuration exports) into AI-assisted review systems, attackers or adversarial insiders can embed **indirect prompt injections**—coercing an LLM into ignoring audit criteria, exfiltrating context over Markdown beacons, or declaring non-compliant controls satisfied. AEGIS inspects raw bytes *before* tokenization, enforces cryptographic provenance (`SHA-256`), and gates tainted inputs behind mandatory human review.
+AEGIS runs deterministic byte-level heuristics and Shannon entropy checks to provide sub-millisecond pre-filtering for compliance evidence review, gating suspicious inputs behind cryptographic SHA-256 provenance digests.
 
 ---
 
-## Threat Matrix & Detection Rules
+## Detection Heuristics & Rules
 
 ```text
 Raw Evidence Bytes ──▶ [SHA-256 Digest] ──▶ [Unicode & Bidi Audit] ──▶ [Boundary / Verdict Rules] ──▶ [Base64 Unpack] ──▶ Gate
@@ -63,6 +61,14 @@ print(report.risk_score)            # 1.0
 print(report.requires_human_review) # True
 print(report.sha256)                # 64-char SHA-256 provenance digest
 ```
+
+---
+
+## Scope & Limitations
+
+- **Static Pre-Filter:** AEGIS is designed as a fast first-line filter against known structural attack patterns (bidi overrides, template tags, base64 payload smuggling). It does not replace semantic LLM guardrails for nuanced social engineering.
+- **Zero External Dependencies:** Built entirely with Python standard library modules (`re`, `hashlib`, `math`, `argparse`).
+- **Deterministic Latency:** Typical scan latency is `< 1 ms` per document on standard hardware.
 
 ---
 
