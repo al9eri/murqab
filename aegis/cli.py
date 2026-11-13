@@ -1,4 +1,4 @@
-"""Command-line interface for AEGIS untrusted document & evidence scanning."""
+"""Command-line interface for AEGIS untrusted document (.txt, .docx, .pdf) scanning & sanitization."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .scanner import ScanReport, scan_file
+from .scanner import ScanReport, sanitize_file, scan_file
 
 
 def _collect_targets(target: Path) -> list[Path]:
@@ -37,11 +37,12 @@ def _print_human(reports: list[ScanReport]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="aegis",
-        description="AEGIS — Untrusted Evidence & Indirect Prompt-Injection Firewall",
+        description="AEGIS — Untrusted Document (.docx, .pdf, .txt) & Prompt-Injection Scanner",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
-    scan_p = sub.add_parser("scan", help="Scan a file or directory for prompt-injection vectors")
-    scan_p.add_argument("path", type=Path, help="Target file or directory path")
+
+    scan_p = sub.add_parser("scan", help="Scan a file or directory for prompt-injection & stealth text vectors")
+    scan_p.add_argument("path", type=Path, help="Target file or directory path (.txt, .md, .docx, .pdf)")
     scan_p.add_argument("--json", action="store_true", help="Emit structured JSON report")
     scan_p.add_argument(
         "--strict",
@@ -49,7 +50,22 @@ def main(argv: list[str] | None = None) -> int:
         help="Return non-zero exit code on any finding (including FLAGGED)",
     )
 
+    san_p = sub.add_parser("sanitize", help="Extract text from file (.txt, .docx, .pdf) and strip stealth Unicode")
+    san_p.add_argument("path", type=Path, help="Target file path")
+    san_p.add_argument("-o", "--output", type=Path, default=None, help="Optional output file path")
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "sanitize":
+        cleaned = sanitize_file(args.path)
+        if args.output:
+            args.output.write_text(cleaned, encoding="utf-8")
+        else:
+            sys.stdout.write(cleaned)
+            if not cleaned.endswith("\n"):
+                sys.stdout.write("\n")
+        return 0
+
     targets = _collect_targets(args.path)
     reports = [scan_file(t) for t in targets]
 

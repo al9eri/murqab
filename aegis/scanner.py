@@ -1,14 +1,19 @@
-"""Core static & heuristic scanner for untrusted LLM inputs and compliance evidence."""
+"""Core static & heuristic scanner for untrusted LLM inputs, .docx/.pdf files, and compliance evidence."""
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import re
+import unicodedata
+import xml.etree.ElementTree as ET
+import zipfile
+import zlib
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 
 
 class Severity(str, Enum):
@@ -24,6 +29,8 @@ SEVERITY_WEIGHT = {
     Severity.HIGH: 0.70,
     Severity.CRITICAL: 1.00,
 }
+
+MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -68,6 +75,10 @@ ZERO_WIDTH_CODEPOINTS = {
     0x200D,  # ZERO WIDTH JOINER
     0x2060,  # WORD JOINER
     0xFEFF,  # ZERO WIDTH NO-BREAK SPACE (mid-stream)
+}
+
+NEAR_WHITE_HEX = {
+    "FFFFFF", "FEFEFE", "FDFDFD", "FCFCFC", "FBFBFB", "FAFAFA", "F9F9F9", "F8F8F8",
 }
 
 
@@ -146,6 +157,13 @@ SMUGGLED_KEYWORDS = (
     b"compliant",
 )
 
+PDF_STREAM_RE = re.compile(rb"stream\r?\n(.*?)\r?\nendstream", re.DOTALL)
+PDF_LITERAL_STR_RE = re.compile(r"\(([^()\\]*(?:\\.[^()\\]*)*)\)")
+PDF_ACTION_RE = re.compile(rb"/(JavaScript|JS|Launch)\b")
+PDF_INVISIBLE_TR_RE = re.compile(r"\b3\s+Tr\b")
+PDF_WHITE_FILL_RE = re.compile(r"\b(?:1(?:\.0+)?\s+1(?:\.0+)?\s+1(?:\.0+)?\s+rg|1(?:\.0+)?\s+g)\b")
+PDF_MICRO_FONT_RE = re.compile(r"/F\d+\s+(?:0(?:\.\d+)?|1(?:\.0+)?)\s+Tf\b")
+
 
 def _line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
@@ -157,6 +175,159 @@ def _clean_snippet(text: str, start: int, end: int, max_len: int = 72) -> str:
     if len(escaped) > max_len:
         return escaped[: max_len - 3] + "..."
     return escaped
+
+
+def _local_tag(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
+
+def _inspect_docx(payload: bytes) -> Tuple[str, List[Finding]]:
+    """Unpack OOXML (.docx) in memory, detect hidden/white/1pt text runs, and extract text."""
+    findings: List[Finding] = []
+    extracted_chunks: List[str] = []
+    total_unpacked = 0
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+            names = zf.namelist()
+            if not any(n.startswith("word/") for n in names):
+                return payload.decode("utf-8", errors="replace"), findings
+
+            for name in names:
+                if not (name.endswith(".xml") or name.endswith(".rels")):
+                    continue
+                info = zf.getinfo(name)
+                if info.file_size > MAX_ARCHIVE_BYTES or (total_unpacked + info.file_size) > MAX_ARCHIVE_BYTES:
+                    break
+                total_unpacked += info.file_size
+                raw_xml = zf.read(name)
+                if b"<!ENTITY" in raw_xml:
+                    findings.append(
+                        Finding(
+                            rule_id="AEGIS-DOC-001",
+                            category="hidden_document_text",
+                            severity=Severity.CRITICAL,
+                            line=1,
+                            offset=0,
+                            description=f"XML entity declaration inside OOXML archive member '{name}'.",
+                            snippet="<!ENTITY ...>",
+                        )
+                    )
+                    continue
+
+                try:
+                    root = ET.fromstring(raw_xml)
+                except ET.ParseError:
+                    continue
+
+                for elem in root.iter():
+                    ltag = _local_tag(elem.tag)
+                    if ltag == "r":
+                        run_texts = [
+                            child.text for child in elem.iter()
+                            if _local_tag(child.tag) in ("t", "instrText") and child.text
+                        ]
+                        joined_run = "".join(run_texts).strip()
+                        if not joined_run:
+                            continue
+
+                        reasons: List[str] = []
+                        for prop in elem.iter():
+                            ptag = _local_tag(prop.tag)
+                            if ptag in ("vanish", "webHidden"):
+                                val = next((v for k, v in prop.attrib.items() if _local_tag(k) == "val"), "true")
+                                if val.lower() not in ("0", "false", "off"):
+                                    reasons.append(f"w:{ptag}")
+                            elif ptag == "sz":
+                                val = next((v for k, v in prop.attrib.items() if _local_tag(k) == "val"), "")
+                                if val.isdigit() and int(val) <= 2:
+                                    reasons.append(f"micro-font(w:sz={val})")
+                            elif ptag == "color":
+                                val = next((v for k, v in prop.attrib.items() if _local_tag(k) == "val"), "")
+                                if val.upper() in NEAR_WHITE_HEX:
+                                    reasons.append(f"white-text(#{val.upper()})")
+
+                        if reasons:
+                            findings.append(
+                                Finding(
+                                    rule_id="AEGIS-DOC-001",
+                                    category="hidden_document_text",
+                                    severity=Severity.CRITICAL,
+                                    line=1,
+                                    offset=0,
+                                    description=(
+                                        f"Stealth OOXML text run in '{name}' via {', '.join(reasons)}."
+                                    ),
+                                    snippet=joined_run[:68],
+                                )
+                            )
+                    elif ltag in ("t", "instrText", "description", "subject", "title", "keywords") and elem.text:
+                        extracted_chunks.append(elem.text)
+    except zipfile.BadZipFile:
+        return payload.decode("utf-8", errors="replace"), findings
+
+    return "\n".join(extracted_chunks), findings
+
+
+def _inspect_pdf(payload: bytes) -> Tuple[str, List[Finding]]:
+    """Decompress PDF streams, detect 3 Tr invisible text / white fill / JS actions, and extract strings."""
+    findings: List[Finding] = []
+    extracted_chunks: List[str] = []
+
+    for match in PDF_ACTION_RE.finditer(payload):
+        action = match.group(1).decode("ascii", errors="replace")
+        findings.append(
+            Finding(
+                rule_id="AEGIS-PDF-001",
+                category="pdf_stealth_layer",
+                severity=Severity.CRITICAL,
+                line=1,
+                offset=match.start(),
+                description=f"Embedded PDF executable action '/{action}' detected.",
+                snippet=f"/{action} at byte {match.start()}",
+            )
+        )
+
+    decoded_streams: List[str] = [payload.decode("latin-1", errors="replace")]
+    for idx, smatch in enumerate(PDF_STREAM_RE.finditer(payload)):
+        raw_stream = smatch.group(1)
+        try:
+            decomp = zlib.decompressobj()
+            inflated = decomp.decompress(raw_stream, MAX_ARCHIVE_BYTES)
+            decoded_streams.append(inflated.decode("latin-1", errors="replace"))
+        except Exception:
+            continue
+
+    for s_idx, stream_text in enumerate(decoded_streams):
+        stealth_reasons: List[str] = []
+        if PDF_INVISIBLE_TR_RE.search(stream_text):
+            stealth_reasons.append("invisible-render-mode(3 Tr)")
+        if PDF_WHITE_FILL_RE.search(stream_text) and ("Tj" in stream_text or "TJ" in stream_text):
+            stealth_reasons.append("white-fill(1 1 1 rg)")
+        if PDF_MICRO_FONT_RE.search(stream_text):
+            stealth_reasons.append("micro-font(<=1pt Tf)")
+
+        literals = [m.group(1) for m in PDF_LITERAL_STR_RE.finditer(stream_text)]
+        joined_literals = " ".join(literals).strip()
+        if joined_literals:
+            extracted_chunks.append(joined_literals)
+
+        if stealth_reasons and s_idx > 0:
+            findings.append(
+                Finding(
+                    rule_id="AEGIS-PDF-001",
+                    category="pdf_stealth_layer",
+                    severity=Severity.CRITICAL,
+                    line=1,
+                    offset=0,
+                    description=(
+                        f"Stealth PDF text operator in stream #{s_idx}: {', '.join(stealth_reasons)}."
+                    ),
+                    snippet=(joined_literals or stream_text.strip())[:68],
+                )
+            )
+
+    return "\n".join(extracted_chunks), findings
 
 
 def _scan_unicode_stego(text: str) -> Iterable[Finding]:
@@ -234,10 +405,36 @@ def _scan_base64_smuggling(text: str) -> Iterable[Finding]:
             )
 
 
+def extract_text_from_bytes(payload: bytes) -> Tuple[str, List[Finding]]:
+    """Extract inspectable text and format-specific stealth findings from raw bytes, .docx, or .pdf."""
+    if payload.startswith(b"PK\x03\x04"):
+        return _inspect_docx(payload)
+    if payload.startswith(b"%PDF-"):
+        return _inspect_pdf(payload)
+    return payload.decode("utf-8", errors="replace"), []
+
+
+def sanitize_text(text: str) -> str:
+    """Strip Trojan Source bidi overrides, Plane-14 tags, zero-width codepoints, and NFKC-normalize."""
+    cleaned = "".join(
+        ch for ch in text
+        if ord(ch) not in BIDI_CODEPOINTS
+        and not (0xE0000 <= ord(ch) <= 0xE007F)
+        and ord(ch) not in ZERO_WIDTH_CODEPOINTS
+    )
+    return unicodedata.normalize("NFKC", cleaned)
+
+
+def sanitize_file(path: str | Path) -> str:
+    """Extract text from a text, .docx, or .pdf file and return sanitized, normalized text."""
+    raw = Path(path).read_bytes()
+    extracted, _ = extract_text_from_bytes(raw)
+    return sanitize_text(extracted)
+
+
 def scan_bytes(payload: bytes, source: str = "<memory>") -> ScanReport:
     digest = hashlib.sha256(payload).hexdigest()
-    text = payload.decode("utf-8", errors="replace")
-    findings: list[Finding] = []
+    text, findings = extract_text_from_bytes(payload)
 
     findings.extend(_scan_unicode_stego(text))
 
