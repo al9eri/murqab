@@ -11,6 +11,8 @@ use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;
 use zip::ZipArchive;
 
+pub mod mcp;
+
 pub const MAX_ARCHIVE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -123,6 +125,26 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             )
             .expect("valid regex"),
             description: "Embedded agent tool-invocation or shell execution directive inside document.",
+        },
+        PatternRule {
+            rule_id: "AEGIS-MCP-006",
+            category: "cross_tool_hijack",
+            severity: Severity::Critical,
+            pattern: Regex::new(
+                r"(?i)(~/\.ssh|/etc/passwd|/etc/shadow|\b(exfiltrate|dump|read)\b.{0,24}(\.env\b|id_rsa|api[_\s]?key|secret)|\b(call|use|invoke)\s+(the\s+)?(bash|shell|terminal|filesystem|email)\s+tool\b)",
+            )
+            .expect("valid regex"),
+            description: "Cross-tool hijacking or local credential/secret exfiltration attempt in tool output.",
+        },
+        PatternRule {
+            rule_id: "AEGIS-INJ-003",
+            category: "html_comment_smuggling",
+            severity: Severity::High,
+            pattern: Regex::new(
+                r"(?is)<!--.{0,240}?(ignore|system|override|instruction|compliant|execute|exfiltrate).{0,240}?-->",
+            )
+            .expect("valid regex"),
+            description: "Hidden HTML/Markdown comment carrying prompt-injection directive.",
         },
     ]
 });

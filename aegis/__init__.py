@@ -4,6 +4,7 @@ from .scanner import (
     Finding,
     ScanReport,
     Severity,
+    guard_tool,
     sanitize_file,
     sanitize_text,
     scan_bytes,
@@ -15,10 +16,11 @@ __all__ = [
     "Finding",
     "ScanReport",
     "Severity",
+    "guard_tool",
     "sanitize_file",
     "sanitize_text",
     "scan_bytes",
     "scan_file",
     "scan_text",
 ]
-__version__ = "0.3.0"
+__version__ = "0.4.0"

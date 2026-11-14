@@ -1,6 +1,6 @@
 [package]
 name = "aegis-core"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 description = "Zero-dependency-runtime Rust core for indirect prompt-injection, .docx/.pdf stealth-text, and Unicode smuggling detection"

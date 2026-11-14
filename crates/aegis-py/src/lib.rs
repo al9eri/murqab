@@ -1,4 +1,4 @@
-use aegis_core::{sanitize_bytes, sanitize_text, scan_bytes};
+use aegis_core::{mcp, sanitize_bytes, sanitize_text, scan_bytes};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -45,10 +45,16 @@ fn sanitize_bytes_native(py: Python<'_>, payload: &[u8]) -> String {
     py.allow_threads(|| sanitize_bytes(payload))
 }
 
+#[pyfunction]
+fn filter_mcp_line_native(py: Python<'_>, line: &str, strict_block: bool) -> (String, usize) {
+    py.allow_threads(|| mcp::process_json_rpc_line(line, strict_block))
+}
+
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scan_bytes_native, m)?)?;
     m.add_function(wrap_pyfunction!(sanitize_text_native, m)?)?;
     m.add_function(wrap_pyfunction!(sanitize_bytes_native, m)?)?;
+    m.add_function(wrap_pyfunction!(filter_mcp_line_native, m)?)?;
     Ok(())
 }

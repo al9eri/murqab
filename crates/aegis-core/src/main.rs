@@ -1,4 +1,4 @@
-use aegis_core::{sanitize_bytes, scan_bytes, ScanReport};
+use aegis_core::{mcp, sanitize_bytes, scan_bytes, ScanReport};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -55,11 +55,26 @@ fn print_human(reports: &[ScanReport]) {
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
-        eprintln!("Usage: aegis <scan|sanitize> <path> [--json] [--strict] [-o <out>]");
+        eprintln!("Usage: aegis <scan|sanitize|mcp-proxy> ...");
         process::exit(1);
     }
 
     match args[0].as_str() {
+        "mcp-proxy" => {
+            let strict_block = args.windows(2).any(|w| w[0] == "--mode" && w[1] == "block");
+            let sep = args.iter().position(|a| a == "--");
+            let cmd_slice = match sep {
+                Some(idx) => &args[idx + 1..],
+                None => args.get(1..).unwrap_or(&[]),
+            };
+            match mcp::run_mcp_proxy(cmd_slice, strict_block) {
+                Ok(code) => process::exit(code),
+                Err(e) => {
+                    eprintln!("[aegis mcp-proxy] {e}");
+                    process::exit(1);
+                }
+            }
+        }
         "sanitize" => {
             let Some(path_str) = args.get(1) else {
                 eprintln!("Missing target file path");

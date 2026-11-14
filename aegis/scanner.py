@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from functools import wraps
+import json
 from pathlib import Path
-from typing import List
+from typing import Any, Callable, List
 
-from ._native import sanitize_bytes_native, sanitize_text_native, scan_bytes_native
+from ._native import (
+    filter_mcp_line_native,
+    sanitize_bytes_native,
+    sanitize_text_native,
+    scan_bytes_native,
+)
 
 
 class Severity(str, Enum):
@@ -88,3 +95,27 @@ def scan_text(text: str, source: str = "<string>") -> ScanReport:
 def scan_file(path: str | Path) -> ScanReport:
     file_path = Path(path)
     return scan_bytes(file_path.read_bytes(), source=str(file_path))
+
+
+def guard_tool(mode: str = "sanitize") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Decorator that scans and blocks/sanitizes tool outputs before an LLM agent consumes them."""
+    strict = mode == "block"
+
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            out = fn(*args, **kwargs)
+            payload_str = out if isinstance(out, str) else json.dumps(out, default=str)
+            rpc = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": payload_str}})
+            filtered, count = filter_mcp_line_native(rpc, strict)
+            if count == 0:
+                return out
+            parsed = json.loads(filtered)
+            if "error" in parsed:
+                raise PermissionError(parsed["error"]["message"])
+            sanitized = parsed["result"]["content"]
+            return sanitized if isinstance(out, str) else {"content": sanitized}
+
+        return wrapper
+
+    return decorator
