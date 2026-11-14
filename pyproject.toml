@@ -10,6 +10,22 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "Zayed Alnuaimi"}]
+keywords = [
+  "prompt-injection",
+  "llm-security",
+  "rag-security",
+  "ai-security",
+  "pdf-sanitizer",
+  "docx",
+  "trojan-source",
+  "unicode-security",
+  "grc",
+]
+
+[project.urls]
+Homepage = "https://github.com/al9eri/aegis-prompt-guard"
+Repository = "https://github.com/al9eri/aegis-prompt-guard"
+Issues = "https://github.com/al9eri/aegis-prompt-guard/issues"
 
 [project.scripts]
 aegis = "aegis.cli:main"
