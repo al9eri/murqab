@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/aegis-core",
+    "crates/aegis-py",
+]
+resolver = "2"

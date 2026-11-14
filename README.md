@@ -3,16 +3,16 @@
 [![CI](https://github.com/al9eri/aegis-prompt-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/al9eri/aegis-prompt-guard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Zero-dependency Python scanner and sanitizer for catching indirect prompt injections, `.docx` / `.pdf` stealth text layers (white-on-white, $\le 1\text{pt}$ micro-fonts, `<w:vanish/>`, PDF `3 Tr` invisible text), Unicode smuggling (Trojan Source, Plane-14 tags), and encoded payloads before LLM or RAG ingestion.
+Rust-accelerated scanner and sanitizer for catching indirect prompt injections, `.docx` / `.pdf` stealth text layers (white-on-white, $\le 1\text{pt}$ micro-fonts, `<w:vanish/>`, PDF `3 Tr` invisible text), Unicode smuggling (Trojan Source, Plane-14 tags), and encoded payloads before LLM or RAG ingestion.
 
-AEGIS unpacks OOXML (`.docx`) and decompresses PDF `/FlateDecode` streams in memory using only the Python standard library (`zipfile`, `xml.etree.ElementTree`, `zlib`, `unicodedata`), gating suspicious files behind SHA-256 provenance digests.
+Built with a pure **Rust** core (`crates/aegis-core`) for $O(n)$ ReDoS-safe regex scanning and bounded `16 MB` decompression, exposed to Python via **GIL-free `PyO3` (`maturin`)** bindings and a standalone native CLI binary.
 
 ---
 
-## Detection Heuristics & Rules
+## Architecture & Detection Rules
 
 ```text
-Raw File (.docx / .pdf / .txt) ──▶ [SHA-256] ──▶ [OOXML / PDF Stealth Unpack] ──▶ [Unicode & Bidi Audit] ──▶ [Injection & Base64 Rules] ──▶ Gate
+Raw File (.docx / .pdf / .txt) ──▶ [SHA-256] ──▶ [Rust OOXML/PDF Unpack (16 MB cap)] ──▶ [O(n) Regex & Unicode] ──▶ Gate
 ```
 
 | Rule ID | Category | Severity | Vector Addressed |
@@ -33,36 +33,33 @@ Raw File (.docx / .pdf / .txt) ──▶ [SHA-256] ──▶ [OOXML / PDF Stealt
 
 ## Quick Start
 
-### CLI Usage
+### Python (`PyO3` Native Extension)
 
 ```bash
-# Scan a single document (.docx, .pdf, .txt) or an entire evidence directory
-python -m aegis scan ./evidence_bundle/
+pip install maturin
+python -m maturin build --release -o dist && pip install dist/*.whl
 
-# Emit structured JSON with SHA-256 provenance & offsets for CI/CD gating
-python -m aegis scan ./vendor_soc2_report.docx --json --strict
+# Scan a directory or file (.docx, .pdf, .txt)
+python -m aegis scan ./evidence_bundle/ --json --strict
 
-# Extract text from .docx/.pdf/.txt, strip invisible Unicode/bidi, and NFKC-normalize
+# Sanitize and NFKC-normalize text
 python -m aegis sanitize ./vendor_soc2_report.docx -o ./clean_extract.txt
 ```
 
-**Exit Codes (`aegis scan`):**
-- `0` — `CLEAN` (or `FLAGGED` without `--strict`)
-- `1` — `FLAGGED` when running with `--strict`
-- `2` — `QUARANTINE` (critical vector or composite risk score $\ge 0.70$; human review mandatory)
-
-### Python Library API
-
 ```python
-from aegis import sanitize_text, scan_file, scan_text
+from aegis import sanitize_text, scan_file
 
 report = scan_file("vendor_soc2_report.docx")
-print(report.verdict)               # "QUARANTINE"
-print(report.risk_score)            # 1.0
-print(report.requires_human_review) # True
-print(report.sha256)                # 64-char SHA-256 provenance digest
+print(report.verdict, report.risk_score, report.sha256)
 
 clean = sanitize_text("Audit log\u202e with hidden bidi override")
+```
+
+### Standalone Native Rust CLI
+
+```bash
+cargo build --release --bin aegis
+./target/release/aegis scan ./vendor_soc2_report.docx --json --strict
 ```
 
 ---
@@ -70,13 +67,13 @@ clean = sanitize_text("Audit log\u202e with hidden bidi override")
 ## Scope & Limitations
 
 - **Structural & Format Pre-Filter:** AEGIS catches deterministic format smuggling (`.docx` vanished/white text, `.pdf` invisible `3 Tr` streams, Unicode bidi/Plane-14 tags, and Base64 payloads). It complements—rather than replaces—semantic LLM guardrails for nuanced natural-language social engineering.
-- **Zero External Dependencies:** Built entirely on the Python standard library (`zipfile`, `xml.etree.ElementTree`, `zlib`, `unicodedata`, `re`, `hashlib`) with bounded decompression (`16 MB` cap) against zip/flate bombs.
+- **Safety Guarantees:** Rust's `regex` engine guarantees linear $O(n)$ scan time (no ReDoS backtracking), `quick-xml` avoids external XML entity expansion, and `flate2`/`zip` streams enforce a `16 MB` decompression cap.
 
 ---
 
 ## Running Tests
 
 ```bash
-pip install pytest
-pytest -v
+cargo test --workspace
+python -m pytest -v
 ```

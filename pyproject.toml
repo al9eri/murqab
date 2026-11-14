@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "aegis-prompt-guard"
-version = "0.2.0"
-description = "Zero-dependency .docx/.pdf/.txt prompt-injection & stealth-text scanner for LLM and GRC pipelines"
+version = "0.3.0"
+description = "Rust-accelerated .docx/.pdf/.txt prompt-injection & stealth-text scanner for LLM and GRC pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -20,6 +20,7 @@ keywords = [
   "trojan-source",
   "unicode-security",
   "grc",
+  "rust",
 ]
 
 [project.urls]
@@ -30,6 +31,10 @@ Issues = "https://github.com/al9eri/aegis-prompt-guard/issues"
 [project.scripts]
 aegis = "aegis.cli:main"
 
+[tool.maturin]
+manifest-path = "crates/aegis-py/Cargo.toml"
+module-name = "aegis._native"
+features = ["pyo3/extension-module"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]

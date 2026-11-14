@@ -1,0 +1,13 @@
+[package]
+name = "aegis-py"
+version = "0.3.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+aegis-core = { path = "../aegis-core" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
