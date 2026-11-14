@@ -146,6 +146,16 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             .expect("valid regex"),
             description: "Hidden HTML/Markdown comment carrying prompt-injection directive.",
         },
+        PatternRule {
+            rule_id: "MURQAB-MCP-007",
+            category: "tool_manifest_poisoning",
+            severity: Severity::Critical,
+            pattern: Regex::new(
+                r"(?is)(<IMPORTANT>|do\s+not\s+(tell|inform|mention(\s+this)?\s+to)\s+the\s+user|before\s+(using|calling)\s+this\s+tool.{0,40}(read|pass|include|send)|pass\s+the\s+contents\s+of)",
+            )
+            .expect("valid regex"),
+            description: "Tool Poisoning Attack (TPA) hidden directive inside MCP tool manifest or schema.",
+        },
     ]
 });
 
