@@ -1,4 +1,4 @@
-"""AEGIS — Untrusted Evidence & Indirect Prompt-Injection Scanner (.txt, .docx, .pdf)."""
+﻿"""MURQAB — Untrusted Evidence & Indirect Prompt-Injection Scanner (.txt, .docx, .pdf)."""
 
 from .scanner import (
     Finding,

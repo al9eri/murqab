@@ -1,4 +1,4 @@
-"""Python wrapper over the Rust `aegis._native` scanner and sanitizer."""
+﻿"""Python wrapper over the Rust `murqab._native` scanner and sanitizer."""
 
 from __future__ import annotations
 

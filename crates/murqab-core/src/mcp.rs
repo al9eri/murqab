@@ -1,4 +1,4 @@
-use crate::{sanitize_text, scan_bytes};
+﻿use crate::{sanitize_text, scan_bytes};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
@@ -23,7 +23,7 @@ fn inspect_and_patch_text(text: &str, blocked_rules: &mut BTreeSet<String>) -> O
         .collect::<Vec<_>>()
         .join(",");
     Some(format!(
-        "<untrusted_tool_output aegis_verdict=\"{}\" rules=\"{rules_csv}\">{clean}</untrusted_tool_output>",
+        "<untrusted_tool_output murqab_verdict=\"{}\" rules=\"{rules_csv}\">{clean}</untrusted_tool_output>",
         report.verdict
     ))
 }
@@ -79,7 +79,7 @@ pub fn process_json_rpc_line(line: &str, strict_block: bool) -> (String, usize) 
             "id": id,
             "error": {
                 "code": -32001,
-                "message": format!("AEGIS blocked indirect prompt injection [{}]", rules_vec.join(", "))
+                "message": format!("MURQAB blocked indirect prompt injection [{}]", rules_vec.join(", "))
             }
         });
         return (blocked.to_string(), count);
@@ -113,7 +113,7 @@ pub fn run_mcp_proxy(cmd: &[String], strict_block: bool) -> Result<i32, String> 
         let Ok(line) = line_res else { break };
         let (filtered, findings) = process_json_rpc_line(&line, strict_block);
         if findings > 0 {
-            eprintln!("[aegis mcp-proxy] intercepted {findings} injection rule(s) in tool response");
+            eprintln!("[murqab mcp-proxy] intercepted {findings} injection rule(s) in tool response");
         }
         if writeln!(out, "{filtered}").is_err() || out.flush().is_err() {
             break;
@@ -135,8 +135,8 @@ mod tests {
         let (sanitized, count) = process_json_rpc_line(raw, false);
         assert!(count >= 2);
         assert!(sanitized.contains("<untrusted_tool_output"));
-        assert!(sanitized.contains("AEGIS-INJ-002"));
-        assert!(sanitized.contains("AEGIS-MCP-006"));
+        assert!(sanitized.contains("MURQAB-INJ-002"));
+        assert!(sanitized.contains("MURQAB-MCP-006"));
     }
 
     #[test]

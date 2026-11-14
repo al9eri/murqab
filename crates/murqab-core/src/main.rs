@@ -1,4 +1,4 @@
-use aegis_core::{mcp, sanitize_bytes, scan_bytes, ScanReport};
+﻿use murqab_core::{mcp, sanitize_bytes, scan_bytes, ScanReport};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -55,7 +55,7 @@ fn print_human(reports: &[ScanReport]) {
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
-        eprintln!("Usage: aegis <scan|sanitize|mcp-proxy> ...");
+        eprintln!("Usage: murqab <scan|sanitize|mcp-proxy> ...");
         process::exit(1);
     }
 
@@ -70,7 +70,7 @@ fn main() {
             match mcp::run_mcp_proxy(cmd_slice, strict_block) {
                 Ok(code) => process::exit(code),
                 Err(e) => {
-                    eprintln!("[aegis mcp-proxy] {e}");
+                    eprintln!("[murqab mcp-proxy] {e}");
                     process::exit(1);
                 }
             }

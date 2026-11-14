@@ -1,12 +1,12 @@
-[package]
-name = "aegis-core"
+﻿[package]
+name = "murqab-core"
 version = "0.4.0"
 edition = "2021"
 license = "MIT"
 description = "Zero-dependency-runtime Rust core for indirect prompt-injection, .docx/.pdf stealth-text, and Unicode smuggling detection"
 
 [[bin]]
-name = "aegis"
+name = "murqab"
 path = "src/main.rs"
 
 [dependencies]

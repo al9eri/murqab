@@ -1,4 +1,4 @@
-"""Reproducible MCP tool-poisoning demo & latency benchmark for aegis-prompt-guard."""
+﻿"""Reproducible MCP tool-poisoning demo & latency benchmark for murqab."""
 
 import json
 import subprocess
@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from aegis import scan_bytes
+from murqab import scan_bytes
 
 MOCK_MCP_SERVER = """
 import json, sys
@@ -29,7 +29,7 @@ for line in sys.stdin:
 
 def main() -> None:
     bin_path = Path(__file__).resolve().parent.parent / "target" / "release" / (
-        "aegis.exe" if sys.platform == "win32" else "aegis"
+        "murqab.exe" if sys.platform == "win32" else "murqab"
     )
     if bin_path.exists():
         req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call"}) + "\n"
@@ -40,7 +40,7 @@ def main() -> None:
             text=True,
             timeout=10,
         )
-        print("=== Live aegis mcp-proxy (--mode block) ===")
+        print("=== Live murqab mcp-proxy (--mode block) ===")
         print("STDOUT:", proc.stdout.strip())
         print("STDERR:", proc.stderr.strip())
 

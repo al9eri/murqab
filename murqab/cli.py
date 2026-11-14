@@ -1,4 +1,4 @@
-"""Command-line interface for AEGIS untrusted document (.txt, .docx, .pdf) scanning & sanitization."""
+﻿"""Command-line interface for MURQAB untrusted document (.txt, .docx, .pdf) scanning & sanitization."""
 
 from __future__ import annotations
 
@@ -36,8 +36,8 @@ def _print_human(reports: list[ScanReport]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="aegis",
-        description="AEGIS — Untrusted Document (.docx, .pdf, .txt) & Prompt-Injection Scanner",
+        prog="murqab",
+        description="MURQAB — Untrusted Document (.docx, .pdf, .txt) & Prompt-Injection Scanner",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 

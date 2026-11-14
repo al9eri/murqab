@@ -1,4 +1,4 @@
-use aegis_core::{mcp, sanitize_bytes, sanitize_text, scan_bytes};
+﻿use murqab_core::{mcp, sanitize_bytes, sanitize_text, scan_bytes};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 

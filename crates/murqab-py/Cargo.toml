@@ -1,5 +1,5 @@
-[package]
-name = "aegis-py"
+﻿[package]
+name = "murqab-py"
 version = "0.4.0"
 edition = "2021"
 license = "MIT"
@@ -9,5 +9,5 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-aegis-core = { path = "../aegis-core" }
+murqab-core = { path = "../murqab-core" }
 pyo3 = { version = "0.23", features = ["extension-module"] }

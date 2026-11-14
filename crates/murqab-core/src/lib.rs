@@ -1,4 +1,4 @@
-use base64::engine::general_purpose::STANDARD as B64_STANDARD;
+﻿use base64::engine::general_purpose::STANDARD as B64_STANDARD;
 use base64::Engine;
 use flate2::read::ZlibDecoder;
 use quick_xml::events::Event;
@@ -77,7 +77,7 @@ struct PatternRule {
 static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
     vec![
         PatternRule {
-            rule_id: "AEGIS-INJ-001",
+            rule_id: "MURQAB-INJ-001",
             category: "boundary_spoofing",
             severity: Severity::Critical,
             pattern: Regex::new(
@@ -87,7 +87,7 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             description: "Chat-template delimiter or system-role boundary spoofing token detected.",
         },
         PatternRule {
-            rule_id: "AEGIS-INJ-002",
+            rule_id: "MURQAB-INJ-002",
             category: "instruction_override",
             severity: Severity::High,
             pattern: Regex::new(
@@ -97,7 +97,7 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             description: "Explicit instruction-override directive embedded in untrusted text.",
         },
         PatternRule {
-            rule_id: "AEGIS-GRC-003",
+            rule_id: "MURQAB-GRC-003",
             category: "verdict_manipulation",
             severity: Severity::Critical,
             pattern: Regex::new(
@@ -107,7 +107,7 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             description: "Embedded attempt to coerce automated compliance or audit status.",
         },
         PatternRule {
-            rule_id: "AEGIS-EXF-004",
+            rule_id: "MURQAB-EXF-004",
             category: "markdown_exfiltration",
             severity: Severity::High,
             pattern: Regex::new(
@@ -117,7 +117,7 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             description: "Suspicious Markdown image beacon URL with query-parameter exfiltration sink.",
         },
         PatternRule {
-            rule_id: "AEGIS-TOOL-005",
+            rule_id: "MURQAB-TOOL-005",
             category: "tool_hijack",
             severity: Severity::High,
             pattern: Regex::new(
@@ -127,7 +127,7 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             description: "Embedded agent tool-invocation or shell execution directive inside document.",
         },
         PatternRule {
-            rule_id: "AEGIS-MCP-006",
+            rule_id: "MURQAB-MCP-006",
             category: "cross_tool_hijack",
             severity: Severity::Critical,
             pattern: Regex::new(
@@ -137,7 +137,7 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             description: "Cross-tool hijacking or local credential/secret exfiltration attempt in tool output.",
         },
         PatternRule {
-            rule_id: "AEGIS-INJ-003",
+            rule_id: "MURQAB-INJ-003",
             category: "html_comment_smuggling",
             severity: Severity::High,
             pattern: Regex::new(
@@ -273,7 +273,7 @@ fn inspect_docx(payload: &[u8]) -> (String, Vec<Finding>) {
 
         if buf.windows(8).any(|w| w == b"<!ENTITY") {
             findings.push(Finding {
-                rule_id: "AEGIS-DOC-001".to_string(),
+                rule_id: "MURQAB-DOC-001".to_string(),
                 category: "hidden_document_text".to_string(),
                 severity: Severity::Critical,
                 line: 1,
@@ -336,7 +336,7 @@ fn inspect_docx(payload: &[u8]) -> (String, Vec<Finding>) {
                             extracted_chunks.push(trimmed.to_string());
                             if !run_reasons.is_empty() {
                                 findings.push(Finding {
-                                    rule_id: "AEGIS-DOC-001".to_string(),
+                                    rule_id: "MURQAB-DOC-001".to_string(),
                                     category: "hidden_document_text".to_string(),
                                     severity: Severity::Critical,
                                     line: 1,
@@ -421,7 +421,7 @@ fn inspect_pdf(payload: &[u8]) -> (String, Vec<Finding>) {
         if let Some(m) = cap.get(1) {
             let full = cap.get(0).unwrap();
             findings.push(Finding {
-                rule_id: "AEGIS-PDF-001".to_string(),
+                rule_id: "MURQAB-PDF-001".to_string(),
                 category: "pdf_stealth_layer".to_string(),
                 severity: Severity::Critical,
                 line: 1,
@@ -490,7 +490,7 @@ fn inspect_pdf(payload: &[u8]) -> (String, Vec<Finding>) {
 
         if !stealth_reasons.is_empty() {
             findings.push(Finding {
-                rule_id: "AEGIS-PDF-001".to_string(),
+                rule_id: "MURQAB-PDF-001".to_string(),
                 category: "pdf_stealth_layer".to_string(),
                 severity: Severity::Critical,
                 line: 1,
@@ -519,7 +519,7 @@ fn scan_unicode_stego(text: &str, findings: &mut Vec<Finding>) {
         let cp = ch as u32;
         if is_bidi_codepoint(cp) {
             findings.push(Finding {
-                rule_id: "AEGIS-UNI-001".to_string(),
+                rule_id: "MURQAB-UNI-001".to_string(),
                 category: "trojan_bidi".to_string(),
                 severity: Severity::Critical,
                 line: line_number(text, idx),
@@ -536,7 +536,7 @@ fn scan_unicode_stego(text: &str, findings: &mut Vec<Finding>) {
 
     if let Some(&first) = tag_offsets.first() {
         findings.push(Finding {
-            rule_id: "AEGIS-UNI-002".to_string(),
+            rule_id: "MURQAB-UNI-002".to_string(),
             category: "unicode_tag_smuggling".to_string(),
             severity: Severity::Critical,
             line: line_number(text, first),
@@ -555,7 +555,7 @@ fn scan_unicode_stego(text: &str, findings: &mut Vec<Finding>) {
     if zw_offsets.len() >= 3 {
         let first = zw_offsets[0];
         findings.push(Finding {
-            rule_id: "AEGIS-UNI-003".to_string(),
+            rule_id: "MURQAB-UNI-003".to_string(),
             category: "zero_width_obfuscation".to_string(),
             severity: Severity::Medium,
             line: line_number(text, first),
@@ -595,7 +595,7 @@ fn scan_base64_smuggling(text: &str, findings: &mut Vec<Finding>) {
         if SMUGGLED_KEYWORDS.iter().any(|kw| lowered.contains(kw)) {
             let preview: String = String::from_utf8_lossy(&decoded).chars().take(48).collect();
             findings.push(Finding {
-                rule_id: "AEGIS-ENC-001".to_string(),
+                rule_id: "MURQAB-ENC-001".to_string(),
                 category: "encoded_payload".to_string(),
                 severity: Severity::High,
                 line: line_number(text, m.start()),
@@ -719,8 +719,8 @@ mod tests {
         }
         let report = scan_bytes(&cursor.into_inner(), "vendor.docx");
         assert_eq!(report.verdict, "QUARANTINE");
-        assert!(report.findings.iter().any(|f| f.rule_id == "AEGIS-DOC-001"));
-        assert!(report.findings.iter().any(|f| f.rule_id == "AEGIS-GRC-003"));
+        assert!(report.findings.iter().any(|f| f.rule_id == "MURQAB-DOC-001"));
+        assert!(report.findings.iter().any(|f| f.rule_id == "MURQAB-GRC-003"));
     }
 
     #[test]
@@ -741,7 +741,7 @@ mod tests {
 
         let report = scan_bytes(&pdf, "evidence.pdf");
         assert_eq!(report.verdict, "QUARANTINE");
-        assert!(report.findings.iter().any(|f| f.rule_id == "AEGIS-PDF-001"));
+        assert!(report.findings.iter().any(|f| f.rule_id == "MURQAB-PDF-001"));
     }
 
     #[test]

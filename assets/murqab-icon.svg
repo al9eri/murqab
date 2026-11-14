@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#111318"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="12.5" stroke="#2A2F3A" stroke-width="1.5"/>
+  <!-- Minimalist Emirati Al Murqab Watchtower -->
+  <path d="M22 50L25 22H39L42 50H22Z" stroke="#E5A93C" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M20 22H44" stroke="#E5A93C" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M22 22V17H26V20H30V17H34V20H38V17H42V22" stroke="#E5A93C" stroke-width="2.2" stroke-linejoin="round"/>
+  <!-- Watchtower slit / aperture -->
+  <path d="M32 28V35" stroke="#E5A93C" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Base foundation -->
+  <path d="M17 50H47" stroke="#9CA3AF" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

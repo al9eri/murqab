@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       - name: Run Rust unit tests and build native CLI
         run: |
           cargo test --workspace
-          cargo build --release --bin aegis
+          cargo build --release --bin murqab
       - name: Build PyO3 extension and run pytest
         run: |
           python -m venv .venv

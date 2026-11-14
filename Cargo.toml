@@ -1,6 +1,6 @@
-[workspace]
+﻿[workspace]
 members = [
-    "crates/aegis-core",
-    "crates/aegis-py",
+    "crates/murqab-core",
+    "crates/murqab-py",
 ]
 resolver = "2"
