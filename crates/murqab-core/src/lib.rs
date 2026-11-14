@@ -74,6 +74,13 @@ struct PatternRule {
     description: &'static str,
 }
 
+static SECRET_LEAK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?s)(\bAKIA[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9]{36,}\b|\bsk-(?:ant|proj|live)-[A-Za-z0-9_-]{20,}\b|-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----|\baws_secret_access_key\s*[:=]\s*[A-Za-z0-9/+=]{40}\b)",
+    )
+    .expect("valid regex")
+});
+
 static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
     vec![
         PatternRule {
@@ -155,6 +162,13 @@ static PATTERN_RULES: LazyLock<Vec<PatternRule>> = LazyLock::new(|| {
             )
             .expect("valid regex"),
             description: "Tool Poisoning Attack (TPA) hidden directive inside MCP tool manifest or schema.",
+        },
+        PatternRule {
+            rule_id: "MURQAB-SEC-001",
+            category: "credential_leak",
+            severity: Severity::Critical,
+            pattern: SECRET_LEAK_RE.clone(),
+            description: "Live API key, cloud access token, or private key detected in payload.",
         },
     ]
 });
@@ -635,7 +649,10 @@ pub fn sanitize_text(text: &str) -> String {
             !is_bidi_codepoint(cp) && !is_plane14_tag(cp) && !is_zero_width_codepoint(cp)
         })
         .collect();
-    filtered.nfkc().collect()
+    let normalized: String = filtered.nfkc().collect();
+    SECRET_LEAK_RE
+        .replace_all(&normalized, "[REDACTED_SECRET]")
+        .into_owned()
 }
 
 pub fn sanitize_bytes(payload: &[u8]) -> String {
@@ -759,5 +776,17 @@ mod tests {
         let hidden: String = "evil".chars().map(|c| char::from_u32(0xE0000 + c as u32).unwrap()).collect();
         let dirty = format!("Clean\u{200B}Text\u{202E}{hidden}Here");
         assert_eq!(sanitize_text(&dirty), "CleanTextHere");
+    }
+
+    #[test]
+    fn detects_and_redacts_secret_leaks() {
+        let payload = "AWS_KEY=AKIAIOSFODNN7EXAMPLE leaked in output";
+        let report = scan_bytes(payload.as_bytes(), "env.txt");
+        assert_eq!(report.verdict, "QUARANTINE");
+        assert!(report.findings.iter().any(|f| f.rule_id == "MURQAB-SEC-001"));
+        assert_eq!(
+            sanitize_text(payload),
+            "AWS_KEY=[REDACTED_SECRET] leaked in output"
+        );
     }
 }

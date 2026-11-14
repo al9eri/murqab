@@ -8,20 +8,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 *Al Murqab (المرقب)* — traditional Emirati watchtower.  
-Rust-accelerated **MCP `stdio` security proxy (`murqab mcp-proxy`)**, document scanner, and Python `@guard_tool` decorator for intercepting indirect prompt injections, cross-tool hijacks, hidden `.docx` / `.pdf` stealth text layers, and Unicode smuggling in **`~57 µs` per 10 KB document**.
+Rust-accelerated **bidirectional MCP `stdio` firewall (`murqab mcp-proxy`)**, document scanner, and Python `@guard_tool` decorator for stopping indirect prompt injections, `tools/list` rug-pulls, cross-tool hijacks, outbound secret exfiltration, and hidden `.docx` / `.pdf` stealth text layers in **`~55 µs` per 10 KB document**.
 
-Built on a pure **Rust** core (`crates/murqab-core`) with guaranteed $O(n)$ ReDoS-safe regex matching and bounded `16 MB` archive decompression, exposed via **GIL-free `PyO3` (`maturin`)** bindings and a standalone native CLI binary.
+Built on a pure **Rust** core (`crates/murqab-core`) with guaranteed $O(n)$ ReDoS-safe regex matching, SHA-256 tool manifest pinning, stateful session taint tracking, and bounded `16 MB` archive decompression—exposed via **GIL-free `PyO3` (`maturin`)** bindings and a standalone native CLI binary.
 
 ---
 
 ## Architecture & Detection Rules
 
 ```text
-Untrusted MCP Server / File (.docx, .pdf, .txt) ──▶ [murqab Rust Core (~57 µs)] ──▶ Block (-32001) or Sanitize
+Agent Client ──▶ [Outbound: Egress DLP (-32003) + Taint Sink Guard (-32002)] ──▶ MCP Server
+Agent Client ◀── [Inbound: SHA-256 Tool Pinning + .docx/.pdf/Prompt Scan (-32001)] ◀── MCP Server
 ```
 
 | Rule ID | Category | Severity | Vector Addressed |
 | :--- | :--- | :--- | :--- |
+| `MURQAB-SEC-001` | `credential_leak` | `CRITICAL` | Live AWS (`AKIA...`), GitHub (`ghp_...`), OpenAI/Anthropic (`sk-...`), and PEM private keys; redacted in `sanitize` and blocked (`-32003`) on MCP egress. |
+| `MURQAB-MCP-008` | `tool_rug_pull` | `CRITICAL` | Mid-session MCP `tools/list` schema or description mutation detected via per-tool SHA-256 manifest pinning. |
+| `MURQAB-MCP-007` | `tool_manifest_poisoning` | `CRITICAL` | Tool Poisoning Attacks (TPA) inside `tools/list` descriptions/schemas (`<IMPORTANT>`, `do not tell the user`, `before using this tool ...`). |
 | `MURQAB-MCP-006` | `cross_tool_hijack` | `CRITICAL` | Instructions coercing agents to read `~/.ssh` / `.env` / secrets or invoke secondary shell/email tools. |
 | `MURQAB-INJ-003` | `html_comment_smuggling` | `HIGH` | Hidden HTML/Markdown comments (`<!-- ... ignore/execute/exfiltrate ... -->`) in scraped docs & issues. |
 | `MURQAB-DOC-001` | `hidden_document_text` | `CRITICAL` | OOXML (`.docx`) stealth runs: `<w:vanish/>`, `<w:webHidden/>`, $\le 1\text{pt}$ micro-fonts, or white text (`#FFFFFF`). |
@@ -55,8 +59,8 @@ Wrap any untrusted third-party MCP server without modifying a line of its code:
 }
 ```
 
-- `--mode block`: Returns a JSON-RPC `-32001` security error naming triggered rule IDs if an injection is detected.
-- `--mode sanitize` *(default)*: Strips hidden Unicode/bidi characters and wraps tainted strings in `<untrusted_tool_output>` tags.
+- `--mode block`: Returns a JSON-RPC `-32001` security error on inbound poisoned/drifted manifests or payloads.
+- `--mode sanitize` *(default)*: Strips hidden Unicode/bidi characters, redacts live credentials (`[REDACTED_SECRET]`), wraps tainted strings in `<untrusted_tool_output>` tags, and **taints the session** (`-32002` blocks subsequent `bash`, `shell`, `write_file`, `http_post`, `send_email`, etc.; `-32003` blocks outbound secret exfiltration even in untainted sessions).
 
 ### 2. Python Agent `@guard_tool` & File Scanning (`PyO3`)
 
@@ -81,8 +85,11 @@ python examples/mcp_poison_demo.py
 ```
 
 Observed output (Windows x86_64, Python 3.13 + Rust `PyO3` release build):
-- **Live `mcp-proxy --mode block`:** Intercepted 4 rules (`MURQAB-INJ-002`, `MURQAB-INJ-003`, `MURQAB-MCP-006`, `MURQAB-UNI-002`) $\rightarrow$ returned `-32001` JSON-RPC block.
-- **Throughput:** `1,000 × 9.9 KB` documents scanned in **`56.88 ms`** (**`0.0569 ms/doc`** / **`~57 µs`**).
+- **Stage 1 (`tools/list` TPA):** Blocked with `-32001` (`MURQAB-MCP-006`, `MURQAB-MCP-007`).
+- **Stage 2 (Mid-Session MCP Rug-Pull):** Clean `tools/list` #1 pinned via SHA-256 $\rightarrow$ schema mutation #2 blocked with `-32001` (`MURQAB-MCP-008`).
+- **Stage 3 & 4a (Session Taint Guard):** Poisoned `resources/read` sanitized (`MURQAB-INJ-002`, `MURQAB-INJ-003`, `MURQAB-MCP-006`, `MURQAB-UNI-002`) & session marked tainted $\rightarrow$ follow-up `bash` tool call blocked with `-32002`.
+- **Stage 4b (Untainted Egress Secret DLP):** Outbound `get_weather` carrying `AKIAIOSFODNN7EXAMPLE` blocked immediately with `-32003` (`MURQAB-SEC-001`).
+- **Throughput:** `1,000 × 9.9 KB` (`9900B`) documents scanned in **`55.22 ms`** (**`0.0552 ms/doc`** / **`~55 µs`**).
 
 ---
 
