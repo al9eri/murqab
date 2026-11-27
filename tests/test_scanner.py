@@ -167,3 +167,11 @@ def test_guard_tool_blocks_and_sanitizes():
     res = fetch_wrapped()
     assert res.startswith("<untrusted_tool_output")
     assert "\u202e" not in res
+
+
+def test_detects_and_redacts_secret_leaks():
+    payload = "leaked token AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE in output"
+    report = scan_text(payload)
+    assert report.verdict == "QUARANTINE"
+    assert any(f.rule_id == "MURQAB-SEC-001" for f in report.findings)
+    assert sanitize_text(payload) == "leaked token AWS_ACCESS_KEY_ID=[REDACTED_SECRET] in output"
